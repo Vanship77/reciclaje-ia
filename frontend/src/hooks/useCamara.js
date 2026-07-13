@@ -1,54 +1,92 @@
-import { useState, useRef, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 
-# TODO: Implementar hook useCamara
-# 1. videoRef y canvasRef
-# 2. iniciar() - usar getUserMedia y asignar al video
-# 3. detener() - detener todos los tracks
-# 4. capturar() - tomar foto del video y devolver blob
-
-export const useCamara = () => {
+const useCamara = () => {
+  // Referencia al elemento <video> en el DOM
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [stream, setStream] = useState(null);
-  const [isActive, setIsActive] = useState(false);
-  const [error, setError] = useState(null);
+  // Referencia para guardar el stream de la cámara y poder detenerlo después
+  const streamRef = useRef(null);
 
+  // 1. Iniciar la cámara
   const iniciar = useCallback(async () => {
-    # TODO: Iniciar cámara
-    # try {
-    #   const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    #   videoRef.current.srcObject = mediaStream;
-    #   setStream(mediaStream);
-    #   setIsActive(true);
-    # } catch (err) {
-    #   setError('Error al acceder a la cámara');
-    # }
+    try {
+      // Solicitamos acceso solo a video (idealmente la cámara trasera si es móvil)
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' } 
+      });
+      
+      // Guardamos el stream en nuestra referencia
+      streamRef.current = stream;
+      
+      // Conectamos el stream de video al elemento <video>
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error('Error al acceder a la cámara:', error);
+      // Aquí podrías manejar alertas si el usuario deniega los permisos
+    }
   }, []);
 
+  // 2. Detener la cámara
   const detener = useCallback(() => {
-    # TODO: Detener cámara
-    # if (stream) {
-    #   stream.getTracks().forEach(track => track.stop());
-    #   setStream(null);
-    #   setIsActive(false);
-    # }
-  }, [stream]);
-
-  const capturar = useCallback(() => {
-    # TODO: Capturar imagen
-    # 1. Dibujar video en canvas
-    # 2. Convertir a blob
-    # return blob;
-    return null;
+    if (streamRef.current) {
+      // Recorremos todos los "tracks" (pistas de video/audio) y los apagamos
+      const tracks = streamRef.current.getTracks();
+      tracks.forEach(track => track.stop());
+      
+      // Limpiamos las referencias
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      streamRef.current = null;
+    }
   }, []);
 
+  // 3. Capturar imagen del video y devolver un Blob
+  const capturar = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      const video = videoRef.current;
+      
+      if (!video) {
+        reject(new Error('No hay video activo para capturar'));
+        return;
+      }
+
+      try {
+        // Creamos un canvas invisible en memoria con las dimensiones del video
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Dibujamos el fotograma actual del video en el canvas
+        const contexto = canvas.getContext('2d');
+        contexto.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convertimos el contenido del canvas a un archivo Blob (formato JPEG)
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Error al generar el archivo Blob'));
+            }
+          },
+          'image/jpeg',
+          0.9 // Calidad de compresión (90%)
+        );
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }, []);
+
+  // Retornamos los métodos y referencias necesarios para usar en el componente
   return {
     videoRef,
-    canvasRef,
-    isActive,
-    error,
     iniciar,
     detener,
-    capturar,
+    capturar
   };
 };
+
+export default useCamara;
