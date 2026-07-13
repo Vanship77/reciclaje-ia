@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.log
+
+# Modelo (opcional)
+*.h5
+*.keras
+
+# Dataset (NO SUBIR)
+dataset/
+imagenes_reales/
+trashnet.zip
+
+# Variables de entorno
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend
+node_modules/
+dist/
+build/
+*.local

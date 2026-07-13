@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Modo claro */
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  /* Modo oscuro */
+  .dark body {
+    @apply bg-dark-bg text-dark-text;
+  }
+
+  /* Aplicar a todos los elementos */
+  .dark {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+  }
+
+  .dark .bg-white {
+    background-color: #1e293b !important;
+  }
+
+  .dark .bg-gray-50 {
+    background-color: #0f172a !important;
+  }
+
+  .dark .bg-gray-100 {
+    background-color: #1e293b !important;
+  }
+
+  .dark .bg-gray-200 {
+    background-color: #334155 !important;
+  }
+
+  .dark .text-gray-700 {
+    color: #cbd5e1 !important;
+  }
+
+  .dark .text-gray-600 {
+    color: #94a3b8 !important;
+  }
+
+  .dark .text-gray-500 {
+    color: #64748b !important;
+  }
+
+  .dark .border-gray-200 {
+    border-color: #334155 !important;
+  }
+
+  .dark .border-gray-300 {
+    border-color: #475569 !important;
+  }
+
+  .dark .shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  .dark .shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5) !important;
+  }
+
+  .dark input {
+    @apply bg-gray-700 border-gray-600 text-white;
+  }
+
+  .dark input::placeholder {
+    color: #94a3b8;
+  }
+
+  .dark select {
+    @apply bg-gray-700 border-gray-600 text-white;
+  }
+
+  .dark .card {
+    @apply bg-dark-card border-dark-border;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors;
+  }
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
+  }
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors;
+  }
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-md p-6 dark:bg-dark-card dark:shadow-gray-900;
+  }
+}
