@@ -1,80 +1,63 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token
-from werkzeug.security import generate_password_hash, check_password_hash
-from app import db
-from app.models.user import User
-from app.utils.validaciones import validar_cedula_ecuatoriana
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from app.models.user import db, Usuario
 
-auth_bp = Blueprint('auth', __name__, url_prefix='/api')
+auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/registro', methods=['POST'])
 def registro():
     data = request.get_json()
     
-    campos = ['cedula', 'email', 'nombre', 'password']
-    for campo in campos:
-        if not data.get(campo):
-            return jsonify({'error': f'El campo {campo} es obligatorio'}), 400
+    if not data or not data.get('email') or not data.get('password') or not data.get('cedula'):
+        return jsonify({'error': 'Faltan campos requeridos'}), 400
     
-    validacion = validar_cedula_ecuatoriana(data['cedula'])
-    if not validacion['valida']:
-        return jsonify({'error': validacion['mensaje']}), 400
+    cedula = data['cedula']
+    if len(cedula) != 10 or not cedula.isdigit():
+        return jsonify({'error': 'Cédula debe tener 10 dígitos'}), 400
     
-    if User.query.filter_by(cedula=data['cedula']).first():
-        return jsonify({'error': 'La cédula ya está registrada'}), 400
+    if Usuario.query.filter_by(email=data['email']).first():
+        return jsonify({'error': 'Email ya registrado'}), 400
     
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'error': 'El email ya está registrado'}), 400
+    if Usuario.query.filter_by(cedula=cedula).first():
+        return jsonify({'error': 'Cédula ya registrada'}), 400
     
-    user = User(
-        cedula=data['cedula'],
+    usuario = Usuario(
         email=data['email'],
-        nombre=data['nombre'],
-        password=generate_password_hash(data['password']),
-        rol=data.get('rol', 'usuario')
+        nombre=data.get('nombre', 'Usuario'),
+        cedula=cedula,
+        rol='usuario'
     )
+    usuario.set_password(data['password'])
     
-    db.session.add(user)
+    db.session.add(usuario)
     db.session.commit()
     
-    # ✅ Convertir a string
-    access_token = create_access_token(identity=str(user.id))
-    
     return jsonify({
-        'token': access_token,
-        'user': {
-            'id': user.id,
-            'cedula': user.cedula,
-            'email': user.email,
-            'nombre': user.nombre,
-            'rol': user.rol,
-            'puntaje_total': user.puntaje_total
-        }
+        'mensaje': 'Usuario registrado exitosamente',
+        'usuario': usuario.to_dict()
     }), 201
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
+    usuario = Usuario.query.filter_by(email=data.get('email')).first()
     
-    if not data.get('email') or not data.get('password'):
-        return jsonify({'error': 'Email y contraseña son obligatorios'}), 400
+    if usuario and usuario.check_password(data.get('password')):
+        token = create_access_token(identity=usuario.id)
+        return jsonify({
+            'token': token,
+            'usuario': usuario.to_dict()
+        }), 200
     
-    user = User.query.filter_by(email=data['email']).first()
+    return jsonify({'error': 'Credenciales inválidas'}), 401
+
+@auth_bp.route('/me', methods=['GET'])
+@jwt_required()
+def me():
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(usuario_id)
     
-    if not user or not check_password_hash(user.password, data['password']):
-        return jsonify({'error': 'Credenciales inválidas'}), 401
+    if not usuario:
+        return jsonify({'error': 'Usuario no encontrado'}), 404
     
-    # ✅ Convertir a string
-    access_token = create_access_token(identity=str(user.id))
-    
-    return jsonify({
-        'token': access_token,
-        'user': {
-            'id': user.id,
-            'cedula': user.cedula,
-            'email': user.email,
-            'nombre': user.nombre,
-            'rol': user.rol,
-            'puntaje_total': user.puntaje_total
-        }
-    })
+    return jsonify(usuario.to_dict()), 200

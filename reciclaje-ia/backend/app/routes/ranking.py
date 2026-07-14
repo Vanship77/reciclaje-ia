@@ -1,29 +1,35 @@
 from flask import Blueprint, jsonify
-from flask_jwt_extended import jwt_required
-from app.models.user import User
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.models.user import db, Puntaje, Historial
 
-ranking_bp = Blueprint('ranking', __name__, url_prefix='/api')
-
-@ranking_bp.route('/ranking', methods=['GET'])
-def ranking():
-    usuarios = User.query.order_by(User.puntaje_total.desc()).limit(10).all()
-    
-    return jsonify([{
-        'id': u.id,
-        'nombre': u.nombre,
-        'email': u.email,
-        'puntaje_total': u.puntaje_total,
-        'ultima_clasificacion': u.ultima_clasificacion.isoformat() if u.ultima_clasificacion else None
-    } for u in usuarios])
+ranking_bp = Blueprint('ranking', __name__)
 
 @ranking_bp.route('/puntajes', methods=['GET'])
+def get_puntajes():
+    puntajes = Puntaje.query.order_by(Puntaje.puntos.desc()).limit(10).all()
+    return jsonify([p.to_dict() for p in puntajes]), 200
+
+@ranking_bp.route('/puntajes', methods=['POST'])
 @jwt_required()
-def puntajes():
-    usuarios = User.query.order_by(User.puntaje_total.desc()).all()
+def crear_puntaje():
+    from flask import request
+    usuario_id = get_jwt_identity()
+    data = request.get_json()
     
-    return jsonify([{
-        'id': u.id,
-        'nombre': u.nombre,
-        'email': u.email,
-        'puntaje_total': u.puntaje_total
-    } for u in usuarios])
+    puntaje = Puntaje(
+        usuario_id=usuario_id,
+        puntos=data.get('puntos', 0),
+        material=data.get('material', 'plastic')
+    )
+    
+    db.session.add(puntaje)
+    db.session.commit()
+    
+    return jsonify(puntaje.to_dict()), 201
+
+@ranking_bp.route('/historial', methods=['GET'])
+@jwt_required()
+def get_historial():
+    usuario_id = get_jwt_identity()
+    historial = Historial.query.filter_by(usuario_id=usuario_id).order_by(Historial.fecha.desc()).limit(20).all()
+    return jsonify([h.to_dict() for h in historial]), 200

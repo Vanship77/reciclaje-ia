@@ -1,8 +1,24 @@
-[
+{
+  "clases": [
     "cardboard",
     "glass",
     "metal",
     "paper",
     "plastic",
     "trash"
-]
+  ],
+  "tamano_imagen": [
+    224,
+    224
+  ],
+  "exactitud": 0.90625,
+  "perdida": 0.30063900351524353,
+  "conteo_imagenes": {
+    "cardboard": 403,
+    "glass": 501,
+    "metal": 410,
+    "paper": 594,
+    "plastic": 482,
+    "trash": 137
+  }
+}

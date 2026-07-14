@@ -1,67 +1,43 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import db
-from app.models.user import User
+from app.models.user import db, Usuario, Historial, Puntaje
+from sqlalchemy import func
 
-admin_bp = Blueprint('admin', __name__, url_prefix='/api')
+admin_bp = Blueprint('admin', __name__)
 
-def verificar_admin(user_id):
-    user = User.query.get(user_id)
-    return user and user.rol == 'admin'
-
-@admin_bp.route('/usuarios', methods=['GET'])
+@admin_bp.route('/admin/usuarios', methods=['GET'])
 @jwt_required()
-def listar_usuarios():
-    user_id = get_jwt_identity()
-    if not verificar_admin(user_id):
+def get_usuarios():
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(usuario_id)
+    
+    if not usuario or usuario.rol != 'admin':
         return jsonify({'error': 'Acceso denegado'}), 403
     
-    usuarios = User.query.order_by(User.id).all()
-    
-    return jsonify([{
-        'id': u.id,
-        'cedula': u.cedula,
-        'email': u.email,
-        'nombre': u.nombre,
-        'rol': u.rol,
-        'puntaje_total': u.puntaje_total,
-        'fecha_registro': u.fecha_registro.isoformat()
-    } for u in usuarios])
+    usuarios = Usuario.query.all()
+    return jsonify([u.to_dict() for u in usuarios]), 200
 
-@admin_bp.route('/usuarios/<int:usuario_id>', methods=['PUT'])
+@admin_bp.route('/admin/estadisticas', methods=['GET'])
 @jwt_required()
-def actualizar_usuario(usuario_id):
-    user_id = get_jwt_identity()
-    if not verificar_admin(user_id):
+def get_estadisticas():
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(usuario_id)
+    
+    if not usuario or usuario.rol != 'admin':
         return jsonify({'error': 'Acceso denegado'}), 403
     
-    user = User.query.get(usuario_id)
-    if not user:
-        return jsonify({'error': 'Usuario no encontrado'}), 404
+    total_usuarios = Usuario.query.count()
+    total_clasificaciones = Historial.query.count()
+    total_puntajes = Puntaje.query.count()
     
-    data = request.get_json()
-    if 'rol' in data:
-        user.rol = data['rol']
-    if 'puntaje_total' in data:
-        user.puntaje_total = data['puntaje_total']
+    materiales = db.session.query(
+        Historial.material,
+        func.count(Historial.material)
+    ).group_by(Historial.material).all()
     
-    db.session.commit()
-    return jsonify({'mensaje': 'Usuario actualizado correctamente'})
-
-@admin_bp.route('/usuarios/<int:usuario_id>', methods=['DELETE'])
-@jwt_required()
-def eliminar_usuario(usuario_id):
-    user_id = get_jwt_identity()
-    if not verificar_admin(user_id):
-        return jsonify({'error': 'Acceso denegado'}), 403
-    
-    if usuario_id == user_id:
-        return jsonify({'error': 'No puedes eliminar tu propio usuario'}), 400
-    
-    user = User.query.get(usuario_id)
-    if not user:
-        return jsonify({'error': 'Usuario no encontrado'}), 404
-    
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify({'mensaje': 'Usuario eliminado correctamente'})
+    return jsonify({
+        'total_usuarios': total_usuarios,
+        'total_clasificaciones': total_clasificaciones,
+        'total_puntajes': total_puntajes,
+        'materiales': [{'nombre': m[0], 'cantidad': m[1]} for m in materiales]
+    }), 200
