@@ -1,6 +1,6 @@
-# TODO: Definir constantes del proyecto
-# - CLASES_RESIDUOS: Mapeo de clases a nombres, colores e iconos
-# - COLORS: Colores para gráficas
+// TODO: Definir constantes del proyecto
+// - CLASES_RESIDUOS: Mapeo de clases a nombres, colores e iconos
+// - COLORS: Colores para gráficas
 
 export const CLASES_RESIDUOS = {
   cardboard: { nombre: 'Cartón', color: '#f59e0b', icono: '📦' },

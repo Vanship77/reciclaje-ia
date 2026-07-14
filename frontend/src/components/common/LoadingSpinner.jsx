@@ -1,6 +1,6 @@
 import React from 'react';
 
-# TODO: Implementar componente de carga
+// TODO: Implementar componente de carga
 
 const LoadingSpinner = () => {
   return (

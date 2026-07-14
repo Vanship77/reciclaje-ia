@@ -20,6 +20,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: reciclaje_backend
+    environment:
+      DATABASE_URL: postgresql://reciclaje_user:reciclaje_password@db:5432/reciclaje_db
     ports:
       - "5000:5000"
     depends_on:

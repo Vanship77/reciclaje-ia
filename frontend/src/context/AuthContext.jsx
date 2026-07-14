@@ -16,63 +16,63 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // TODO: Implementar AuthContext
-  // 1. Efecto para cargar usuario de localStorage al iniciar
-  // 2. Función login() - llamar a API y guardar token
-  // 3. Función registro() - llamar a API y guardar token
-  // 4. Función logout() - limpiar localStorage
-  // 5. Exponer: user, loading, isAuthenticated, isAdmin, login, registro, logout
-
   useEffect(() => {
-    // TODO: Cargar usuario desde localStorage
-    // const token = localStorage.getItem('token');
-    // const userData = localStorage.getItem('user');
-    // if (token && userData) setUser(JSON.parse(userData));
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    if (token && userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
     setLoading(false);
   }, []);
 
   const login = async (email, password) => {
-    // TODO: Implementar login
-    // 1. Llamar a apiLogin
-    // 2. Guardar token y user en localStorage
-    // 3. Actualizar estado user
     setError(null);
     try {
-      // const response = await apiLogin(email, password);
-      // const { token, user } = response.data;
-      // localStorage.setItem('token', token);
-      // localStorage.setItem('user', JSON.stringify(user));
-      // setUser(user);
+      const response = await apiLogin(email, password);
+      const { token, user } = response.data;
+      if (!token || !user) {
+        const mensaje = 'El servidor no devolvió una sesión válida';
+        setError(mensaje);
+        return { success: false, error: mensaje };
+      }
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      setUser(user);
       return { success: true };
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al iniciar sesión');
-      return { success: false, error: err.response?.data?.error };
+      const mensaje = err.response?.data?.error || 'Error al iniciar sesión';
+      setError(mensaje);
+      return { success: false, error: mensaje };
     }
   };
 
   const registro = async (userData) => {
-    // TODO: Implementar registro
-    // 1. Llamar a apiRegistro
-    // 2. Guardar token y user en localStorage
-    // 3. Actualizar estado user
     setError(null);
     try {
-      // const response = await apiRegistro(userData);
-      // const { token, user } = response.data;
-      // localStorage.setItem('token', token);
-      // localStorage.setItem('user', JSON.stringify(user));
-      // setUser(user);
+      const response = await apiRegistro(userData);
+      const { token, user } = response.data;
+      if (!token || !user) {
+        const mensaje = 'El servidor no devolvió una sesión válida';
+        setError(mensaje);
+        return { success: false, error: mensaje };
+      }
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      setUser(user);
       return { success: true };
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al registrarse');
-      return { success: false, error: err.response?.data?.error };
+      const mensaje = err.response?.data?.error || 'Error al registrarse';
+      setError(mensaje);
+      return { success: false, error: mensaje };
     }
   };
 
   const logout = () => {
-    // TODO: Implementar logout
-    // 1. Limpiar localStorage
-    // 2. Resetear estado user
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);

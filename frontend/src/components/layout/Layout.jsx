@@ -1,9 +1,9 @@
 import React from 'react';
 import Navbar from '../common/Navbar';
 
-# TODO: Implementar Layout
-# 1. Envolver contenido con Navbar
-# 2. Estructura de página con fondo gris
+// TODO: Implementar Layout
+// 1. Envolver contenido con Navbar
+// 2. Estructura de página con fondo gris
 
 const Layout = ({ children }) => {
   return (
