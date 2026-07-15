@@ -1,5 +1,5 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { login as apiLogin, registro as apiRegistro } from '../api/authApi';
 
 const AuthContext = createContext();
 
@@ -8,14 +8,17 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
+    
     if (token && userData) {
       try {
-        setUser(JSON.parse(userData));
+        const parsed = JSON.parse(userData);
+        setUser(parsed);
+        console.log('🔍 Usuario cargado desde localStorage:', parsed);
+        console.log('🔍 Rol del usuario:', parsed.rol);
       } catch {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -26,33 +29,51 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      setError(null);
-      const response = await apiLogin(email, password);
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
-      return { success: true };
-    } catch (err) {
-      const mensaje = err.response?.data?.error || 'Error al iniciar sesión';
-      setError(mensaje);
-      return { success: false, error: mensaje };
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Error al iniciar sesión' };
+      }
+
+      console.log('🔍 Login exitoso - Usuario:', data.usuario);
+      console.log('🔍 Rol del usuario:', data.usuario.rol);
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.usuario));
+      setUser(data.usuario);
+      
+      return { success: true, user: data.usuario };
+      
+    } catch (error) {
+      console.error('❌ Error en login:', error);
+      return { success: false, error: 'Error al conectar con el servidor' };
     }
   };
 
   const registro = async (userData) => {
     try {
-      setError(null);
-      const response = await apiRegistro(userData);
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
+      const response = await fetch('/api/registro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Error al registrarse' };
+      }
+
       return { success: true };
-    } catch (err) {
-      const mensaje = err.response?.data?.error || 'Error al registrarse';
-      setError(mensaje);
-      return { success: false, error: mensaje };
+      
+    } catch (error) {
+      return { success: false, error: 'Error al conectar con el servidor' };
     }
   };
 
@@ -65,13 +86,17 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     loading,
-    error,
     login,
     registro,
     logout,
-    isAdmin: user?.rol === 'admin',
     isAuthenticated: !!user,
+    isAdmin: user?.rol === 'admin',
+    token: localStorage.getItem('token')
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
