@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models.user import db, Historial
-from services.clasificador import ClasificadorService
+from app.services.clasificador import ClasificadorService
 import base64
 import cv2
 import numpy as np

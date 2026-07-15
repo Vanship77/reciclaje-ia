@@ -26,11 +26,11 @@ def create_app():
     jwt.init_app(app)
     CORS(app, origins=['http://localhost:5173', 'http://localhost:5174', 'http://localhost:80', 'http://localhost'])
     
-    # Registrar blueprints
-    from routes.auth import auth_bp
-    from routes.admin import admin_bp
-    from routes.clasificacion import clasificacion_bp
-    from routes.ranking import ranking_bp
+    # Registrar blueprints - CORREGIDO
+    from app.routes.auth import auth_bp
+    from app.routes.admin import admin_bp
+    from app.routes.clasificacion import clasificacion_bp
+    from app.routes.ranking import ranking_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api')
