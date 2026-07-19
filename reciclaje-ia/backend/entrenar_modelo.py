@@ -1,4 +1,4 @@
-# entrenar_modelo.py - Entrenamiento con EfficientNetB0 (Adaptado)
+# entrenar_modelo.py - Entrenamiento con EfficientNetB0 (FINALMENTE CORREGIDO)
 import os
 import numpy as np
 import tensorflow as tf
@@ -9,18 +9,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix
 import json
-import warnings
-warnings.filterwarnings('ignore')
 
 # ========== CONFIGURACIÓN ==========
-DATASET_DIR = "dataset-resized"  # Tu dataset actual
+DATASET_DIR = "dataset-resized"
 TAMANO_IMAGEN = (224, 224)
 TAMANO_LOTE = 32
 EPOCHS = 30
 CLASES = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
 
 print("=" * 60)
-print("🚀 ENTRENAMIENTO CON EFFICIENTNETB0")
+print("🚀 ENTRENAMIENTO CON EFFICIENTNETB0 (FINALMENTE CORREGIDO)")
 print("=" * 60)
 print(f"📂 Dataset: {DATASET_DIR}")
 print(f"📋 Clases: {CLASES}")
@@ -102,7 +100,7 @@ aumento_datos = tf.keras.Sequential([
     tf.keras.layers.RandomBrightness(0.2, value_range=(0, 255)),
 ])
 
-modelo = tf.keras.Sequential([
+modelo_completo = tf.keras.Sequential([
     tf.keras.layers.Input(shape=(224, 224, 3)),
     aumento_datos,
     tf.keras.layers.Lambda(preprocess_input),
@@ -116,18 +114,18 @@ modelo = tf.keras.Sequential([
 # ========== 4. ENTRENAR ==========
 print("\n📚 FASE 1: Entrenando...")
 
-modelo.compile(
+modelo_completo.compile(
     optimizer='adam',
     loss='sparse_categorical_crossentropy',
     metrics=['accuracy']
 )
 
 callbacks = [
-    EarlyStopping(monitor='val_accuracy', patience=5, restore_best_weights=True, verbose=1),
+    EarlyStopping(monitor='val_accuracy', patience=7, restore_best_weights=True, verbose=1),
     ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, verbose=1)
 ]
 
-historial = modelo.fit(
+historial = modelo_completo.fit(
     datos_entrenamiento,
     validation_data=datos_validacion,
     epochs=EPOCHS,
@@ -138,7 +136,7 @@ historial = modelo.fit(
 # ========== 5. AJUSTE FINO ==========
 print("\n🔧 FASE 2: Ajuste fino...")
 
-efficientnet_layer = modelo.layers[2]
+efficientnet_layer = modelo_completo.layers[2]
 efficientnet_layer.trainable = True
 
 for capa in efficientnet_layer.layers:
@@ -147,13 +145,13 @@ for capa in efficientnet_layer.layers:
 
 print("✅ EfficientNetB0 descongelado")
 
-modelo.compile(
+modelo_completo.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
     loss='sparse_categorical_crossentropy',
     metrics=['accuracy']
 )
 
-historial_ajuste = modelo.fit(
+historial_ajuste = modelo_completo.fit(
     datos_entrenamiento,
     validation_data=datos_validacion,
     epochs=10,
@@ -163,37 +161,44 @@ historial_ajuste = modelo.fit(
 
 # ========== 6. EVALUAR ==========
 print("\n📊 Evaluando modelo...")
-perdida, exactitud = modelo.evaluate(datos_prueba, verbose=0)
+perdida, exactitud = modelo_completo.evaluate(datos_prueba, verbose=0)
 print(f"✅ Precisión en prueba: {exactitud*100:.2f}%")
 
-# ========== 7. GUARDAR ==========
-print("\n💾 Guardando modelo...")
+# ========== 7. GUARDAR (CORREGIDO - CONSTRUIR PRIMERO) ==========
+print("\n💾 Guardando modelo (CONSTRUYENDO PRIMERO)...")
 
-# Crear carpetas
-os.makedirs("modelo", exist_ok=True)
-os.makedirs("modelos_guardados", exist_ok=True)
-
-# Quitar la capa de aumento de datos para guardar
+# Crear modelo SIN la capa de aumento de datos
 nuevas_capas = []
-for i, capa in enumerate(modelo.layers):
-    if i != 1:
+for i, capa in enumerate(modelo_completo.layers):
+    if i != 1:  # Saltar la capa de aumento de datos
         nuevas_capas.append(capa)
 
-modelo_guardar = tf.keras.Sequential(nuevas_capas)
-modelo_guardar.compile(
+modelo_para_guardar = tf.keras.Sequential(nuevas_capas)
+modelo_para_guardar.compile(
     optimizer='adam',
     loss='sparse_categorical_crossentropy',
     metrics=['accuracy']
 )
 
-# Guardar en todos los formatos necesarios
-modelo_guardar.save("modelo/modelo_trashnet.keras")
-modelo_guardar.save("modelo_residuos.keras")
-modelo_guardar.save("modelos_guardados/clasificador_efficientnet.keras")
+# 🔥 CONSTRUIR EL MODELO CON DATOS DE PRUEBA (¡IMPORTANTE!)
+print("🏗️ Construyendo modelo con datos de prueba...")
+for imagenes, etiquetas in datos_entrenamiento.take(1):
+    _ = modelo_para_guardar.predict(imagenes, verbose=0)
+    print("✅ Modelo construido correctamente")
+    break
+
+# Crear carpetas
+os.makedirs("modelo", exist_ok=True)
+os.makedirs("modelos_guardados", exist_ok=True)
+
+# Guardar en todos los formatos
+modelo_para_guardar.save("modelo_residuos.keras")
+modelo_para_guardar.save("modelo/modelo_trashnet.keras")
+modelo_para_guardar.save("modelos_guardados/clasificador_efficientnet.keras")
 
 print("✅ Modelo guardado en:")
-print("   - modelo/modelo_trashnet.keras")
 print("   - modelo_residuos.keras")
+print("   - modelo/modelo_trashnet.keras")
 print("   - modelos_guardados/clasificador_efficientnet.keras")
 
 # Guardar configuración
@@ -247,7 +252,7 @@ etiquetas_reales = []
 etiquetas_predichas = []
 
 for imagenes, etiquetas in datos_prueba:
-    preds = modelo.predict(imagenes, verbose=0)
+    preds = modelo_completo.predict(imagenes, verbose=0)
     etiquetas_reales.extend(etiquetas.numpy())
     etiquetas_predichas.extend(np.argmax(preds, axis=1))
 
@@ -270,6 +275,6 @@ print("\n" + "=" * 60)
 print("✅ ENTRENAMIENTO COMPLETADO")
 print("=" * 60)
 print(f"📊 Precisión: {exactitud*100:.2f}%")
-print(f"💾 Modelo: modelo/modelo_trashnet.keras")
+print(f"💾 Modelo: modelo_residuos.keras")
 print(f"📈 Gráficas: modelos_guardados/")
 print("=" * 60)

@@ -16,11 +16,12 @@ const Navbar = () => {
     navigate('/login');
   };
 
+  // 🔥 MODIFICADO: API Test SOLO para ADMIN
   const navLinks = [
     { path: '/dashboard', label: 'Dashboard', show: !!user },
     { path: '/clasificar', label: 'Clasificar', show: !!user },
     { path: '/admin', label: 'Admin', show: isAdmin },
-    { path: '/api-test', label: 'API Test', show: !!user },
+    { path: '/api-test', label: 'API Test', show: isAdmin }, // ✅ AHORA SOLO ADMIN
   ];
 
   return (

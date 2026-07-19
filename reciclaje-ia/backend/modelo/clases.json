@@ -11,8 +11,8 @@
     224,
     224
   ],
-  "exactitud": 0.90625,
-  "perdida": 0.30063900351524353,
+  "exactitud": 0.9140625,
+  "perdida": 0.29058969020843506,
   "conteo_imagenes": {
     "cardboard": 403,
     "glass": 501,

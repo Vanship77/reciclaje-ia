@@ -1,4 +1,4 @@
-# backend/app.py - API REST para React (CORREGIDO - usando password)
+# backend/app.py - API REST COMPLETA CON CRUD
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -14,10 +14,11 @@ import hashlib
 import time
 from datetime import datetime
 import json
+import traceback
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'tu_clave_secreta_muy_segura')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt_clave_secreta')
+app.config['SECRET_KEY'] = 'mi_clave_secreta_super_segura_1234567890'
+app.config['JWT_SECRET_KEY'] = 'mi_clave_secreta_jwt_super_segura_1234567890'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 
 CORS(app, origins=['http://localhost:5173', 'http://localhost:5174', 'http://localhost:80'])
@@ -90,7 +91,11 @@ def hash_contrasena(password):
 
 # ========== CARGAR MODELO ==========
 print("🔄 Cargando modelo EfficientNetB0 (6 clases)...")
-rutas_modelo = ['modelo_residuos.keras', 'modelos_guardados/clasificador_efficientnet.keras']
+rutas_modelo = [
+    'modelo/modelo_trashnet.keras',
+    'modelo_residuos.keras',
+    'modelos_guardados/clasificador_efficientnet.keras'
+]
 modelo = None
 for ruta in rutas_modelo:
     if os.path.exists(ruta):
@@ -183,7 +188,11 @@ def clasificar_imagen(imagen_cv2):
             ]
         }
 
-# ========== RUTAS ==========
+# ============================================================
+# =====================  RUTAS CRUD  ==========================
+# ============================================================
+
+# ========== 1. AUTENTICACIÓN ==========
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -208,7 +217,7 @@ def login():
         if usuario[3] != password_hash:
             return jsonify({'error': 'Credenciales incorrectas'}), 401
         
-        access_token = create_access_token(identity=usuario[0])
+        access_token = create_access_token(identity=str(usuario[0]))
         
         return jsonify({
             'token': access_token,
@@ -223,6 +232,7 @@ def login():
         
     except Exception as e:
         print(f"❌ Error en login: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/registro', methods=['POST'])
@@ -255,7 +265,6 @@ def registro():
             conn.close()
             return jsonify({'error': 'La cédula ya está registrada'}), 400
         
-        # ✅ CORREGIDO: usa 'password' en lugar de 'contrasena'
         cursor.execute("""
             INSERT INTO usuarios (cedula, nombre, email, password, rol, puntaje_total) 
             VALUES (%s, %s, %s, %s, 'usuario', 0) RETURNING id
@@ -272,6 +281,7 @@ def registro():
         
     except Exception as e:
         print(f"❌ Error en registro: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/me', methods=['GET'])
@@ -299,34 +309,42 @@ def me():
         
     except Exception as e:
         print(f"❌ Error en me: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+# ========== 2. CLASIFICACIÓN ==========
 
 @app.route('/api/clasificar_webcam', methods=['POST'])
 @jwt_required()
 def clasificar_webcam():
     try:
-        usuario_id = get_jwt_identity()
-        data = request.get_json()
+        usuario_id_str = get_jwt_identity()
+        usuario_id = int(usuario_id_str) if usuario_id_str else None
+        print(f"🔑 Usuario autenticado ID: {usuario_id}")
         
-        if not data or 'imagen' not in data:
-            return jsonify({'error': 'No se proporcionó imagen'}), 400
+        if 'imagen' not in request.files:
+            return jsonify({'error': 'No se recibió imagen'}), 400
         
-        import base64
-        imagen_base64 = data['imagen'].split(',')[1] if ',' in data['imagen'] else data['imagen']
-        imagen_bytes = base64.b64decode(imagen_base64)
+        archivo = request.files['imagen']
+        if archivo.filename == '':
+            return jsonify({'error': 'Archivo vacío'}), 400
         
+        imagen_bytes = archivo.read()
         nparr = np.frombuffer(imagen_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
         if img is None:
             return jsonify({'error': 'Error al procesar la imagen'}), 400
         
-        resultado = clasificar_imagen(img)
+        # Clasificar
+        from app.services.clasificador import ClasificadorService
+        clasificador = ClasificadorService()
+        resultado = clasificador.clasificar(img)
         
-        if resultado['clase'] == 'desconocido':
+        if not resultado or resultado.get('clase') == 'desconocido':
             return jsonify({'resultado': resultado, 'guardado': False}), 200
         
-        tipo_es = resultado['clase_es']
+        tipo_es = resultado.get('clase_es', resultado.get('clase', 'plastic'))
         puntos = PUNTOS_BASE.get(tipo_es, 10)
         
         conn = get_db_connection()
@@ -340,7 +358,7 @@ def clasificar_webcam():
             cursor.execute("""
                 INSERT INTO registros_reciclaje (id_usuario, id_tipo_residuo, puntos_ganados, confianza_ia) 
                 VALUES (%s, %s, %s, %s) RETURNING id
-            """, (usuario_id, tipo_id, puntos, resultado['confianza'] / 100))
+            """, (usuario_id, tipo_id, puntos, resultado.get('confianza', 0) / 100))
             
             cursor.execute("""
                 UPDATE usuarios SET puntaje_total = puntaje_total + %s 
@@ -353,25 +371,36 @@ def clasificar_webcam():
             
             resultado['puntos'] = puntos
             resultado['puntos_totales'] = nuevos_puntos
+        else:
+            conn.close()
+            print(f"⚠️ Tipo de residuo '{tipo_es}' no encontrado en BD")
         
         return jsonify({'resultado': resultado, 'guardado': True}), 200
         
     except Exception as e:
         print(f"❌ Error en clasificar_webcam: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+# ========== 3. HISTORIAL (GET) ==========
 
 @app.route('/api/historial', methods=['GET'])
 @jwt_required()
 def get_historial():
     try:
-        usuario_id = get_jwt_identity()
+        usuario_id = int(get_jwt_identity())
         
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT r.id, t.nombre, r.puntos_ganados, r.confianza_ia, r.fecha_hora
+            SELECT 
+                r.id, 
+                COALESCE(t.nombre, 'desconocido') as material,
+                COALESCE(r.puntos_ganados, 0) as puntos,
+                COALESCE(r.confianza_ia, 0) as confianza,
+                r.fecha_hora as fecha
             FROM registros_reciclaje r
-            JOIN tipos_residuo t ON r.id_tipo_residuo = t.id
+            LEFT JOIN tipos_residuo t ON r.id_tipo_residuo = t.id
             WHERE r.id_usuario = %s
             ORDER BY r.fecha_hora DESC
             LIMIT 20
@@ -392,7 +421,10 @@ def get_historial():
         
     except Exception as e:
         print(f"❌ Error en historial: {e}")
-        return jsonify({'error': str(e)}), 500
+        traceback.print_exc()
+        return jsonify([]), 200
+
+# ========== 4. RANKING (GET) ==========
 
 @app.route('/api/ranking', methods=['GET'])
 def get_ranking():
@@ -402,8 +434,8 @@ def get_ranking():
         cursor.execute("""
             SELECT 
                 u.nombre,
-                u.puntaje_total as puntos,
-                COUNT(r.id) as reciclajes
+                COALESCE(u.puntaje_total, 0) as puntos,
+                COALESCE(COUNT(r.id), 0) as reciclajes
             FROM usuarios u
             LEFT JOIN registros_reciclaje r ON u.id = r.id_usuario
             WHERE u.rol != 'admin'
@@ -426,7 +458,10 @@ def get_ranking():
         
     except Exception as e:
         print(f"❌ Error en ranking: {e}")
-        return jsonify({'error': str(e)}), 500
+        traceback.print_exc()
+        return jsonify([]), 200
+
+# ========== 5. PUNTAJES (GET) ==========
 
 @app.route('/api/puntajes', methods=['GET'])
 def get_puntajes():
@@ -436,6 +471,16 @@ def get_puntajes():
         cursor.execute("SELECT nombre, puntos_base FROM tipos_residuo")
         resultados = cursor.fetchall()
         conn.close()
+
+        if not resultados:
+            return jsonify({
+                'plastico': 10,
+                'vidrio': 15,
+                'lata': 10,
+                'papel': 8,
+                'carton': 12,
+                'basura': 5
+            }), 200
         
         puntajes = {}
         for nombre, puntos in resultados:
@@ -445,7 +490,17 @@ def get_puntajes():
         
     except Exception as e:
         print(f"❌ Error en puntajes: {e}")
-        return jsonify({'error': str(e)}), 500
+        traceback.print_exc()
+        return jsonify({
+            'plastico': 10,
+            'vidrio': 15,
+            'lata': 10,
+            'papel': 8,
+            'carton': 12,
+            'basura': 5
+        }), 200
+
+# ========== 6. MODELO (GET) ==========
 
 @app.route('/api/modelo/estado', methods=['GET'])
 @jwt_required()
@@ -457,11 +512,14 @@ def get_estado_modelo():
         'clases_es': MAPEO
     }), 200
 
+# ========== 7. ADMIN - USUARIOS (GET, POST, PUT, DELETE) ==========
+
+# 7.1 GET - Obtener todos los usuarios (solo admin)
 @app.route('/api/admin/usuarios', methods=['GET'])
 @jwt_required()
 def get_usuarios():
     try:
-        usuario_id = get_jwt_identity()
+        usuario_id = int(get_jwt_identity())
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -472,30 +530,45 @@ def get_usuarios():
             conn.close()
             return jsonify({'error': 'Acceso denegado'}), 403
         
-        cursor.execute("SELECT id, cedula, nombre, email, rol, puntaje_total FROM usuarios WHERE rol != 'admin'")
+        cursor.execute("""
+            SELECT 
+                id, 
+                COALESCE(cedula, '') as cedula,
+                nombre, 
+                email, 
+                rol, 
+                COALESCE(puntaje_total, 0) as puntos,
+                fecha_registro
+            FROM usuarios 
+            WHERE rol != 'admin'
+            ORDER BY nombre ASC
+        """)
         usuarios = []
         for row in cursor.fetchall():
             usuarios.append({
                 'id': row[0],
-                'cedula': row[1],
+                'cedula': row[1] or '',
                 'nombre': row[2],
                 'email': row[3],
                 'rol': row[4],
-                'puntos': row[5] or 0
+                'puntos': row[5] or 0,
+                'fecha_registro': row[6].isoformat() if row[6] else None
             })
         
         conn.close()
         return jsonify(usuarios), 200
         
     except Exception as e:
-        print(f"❌ Error en admin/usuarios: {e}")
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Error en get_usuarios: {e}")
+        traceback.print_exc()
+        return jsonify([]), 200
 
-@app.route('/api/admin/estadisticas', methods=['GET'])
+# 7.2 POST - Crear un nuevo usuario (solo admin)
+@app.route('/api/admin/usuarios', methods=['POST'])
 @jwt_required()
-def get_estadisticas_admin():
+def crear_usuario_admin():
     try:
-        usuario_id = get_jwt_identity()
+        usuario_id = int(get_jwt_identity())
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -506,28 +579,218 @@ def get_estadisticas_admin():
             conn.close()
             return jsonify({'error': 'Acceso denegado'}), 403
         
-        cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol != 'admin'")
-        total_usuarios = cursor.fetchone()[0]
+        data = request.get_json()
+        nombre = data.get('nombre')
+        email = data.get('email')
+        password = data.get('password', 'admin123')
+        cedula = data.get('cedula', '')
+        rol_usuario = data.get('rol', 'usuario')
         
-        cursor.execute("SELECT COUNT(*) FROM registros_reciclaje")
-        total_clasificaciones = cursor.fetchone()[0]
+        if not nombre or not email:
+            conn.close()
+            return jsonify({'error': 'Nombre y email son requeridos'}), 400
         
-        cursor.execute("SELECT SUM(puntos_ganados) FROM registros_reciclaje")
-        total_puntos = cursor.fetchone()[0] or 0
+        # Verificar que no exista
+        cursor.execute("SELECT id FROM usuarios WHERE email = %s", (email,))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'El email ya está registrado'}), 400
+        
+        password_hash = hash_contrasena(password)
         
         cursor.execute("""
-            SELECT t.nombre, COUNT(r.id) 
+            INSERT INTO usuarios (cedula, nombre, email, password, rol, puntaje_total)
+            VALUES (%s, %s, %s, %s, %s, 0) RETURNING id
+        """, (cedula, nombre, email, password_hash, rol_usuario))
+        
+        nuevo_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'mensaje': 'Usuario creado exitosamente',
+            'id': nuevo_id,
+            'nombre': nombre,
+            'email': email,
+            'rol': rol_usuario
+        }), 201
+        
+    except Exception as e:
+        print(f"❌ Error en crear_usuario_admin: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# 7.3 PUT - Actualizar un usuario (solo admin)
+@app.route('/api/admin/usuarios/<int:usuario_id>', methods=['PUT'])
+@jwt_required()
+def actualizar_usuario_admin(usuario_id):
+    try:
+        admin_id = int(get_jwt_identity())
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT rol FROM usuarios WHERE id = %s", (admin_id,))
+        rol = cursor.fetchone()
+        
+        if not rol or rol[0] != 'admin':
+            conn.close()
+            return jsonify({'error': 'Acceso denegado'}), 403
+        
+        # Verificar que el usuario existe
+        cursor.execute("SELECT id FROM usuarios WHERE id = %s", (usuario_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        data = request.get_json()
+        
+        # Construir consulta dinámica
+        updates = []
+        params = []
+        
+        if 'nombre' in data:
+            updates.append("nombre = %s")
+            params.append(data['nombre'])
+        if 'email' in data:
+            updates.append("email = %s")
+            params.append(data['email'])
+        if 'cedula' in data:
+            updates.append("cedula = %s")
+            params.append(data['cedula'])
+        if 'rol' in data:
+            updates.append("rol = %s")
+            params.append(data['rol'])
+        if 'puntos' in data:
+            updates.append("puntaje_total = %s")
+            params.append(data['puntos'])
+        if 'password' in data:
+            updates.append("password = %s")
+            params.append(hash_contrasena(data['password']))
+        
+        if not updates:
+            conn.close()
+            return jsonify({'error': 'No hay datos para actualizar'}), 400
+        
+        params.append(usuario_id)
+        query = f"UPDATE usuarios SET {', '.join(updates)} WHERE id = %s RETURNING id, nombre, email, rol, puntaje_total"
+        
+        cursor.execute(query, params)
+        usuario_actualizado = cursor.fetchone()
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'mensaje': 'Usuario actualizado exitosamente',
+            'id': usuario_actualizado[0],
+            'nombre': usuario_actualizado[1],
+            'email': usuario_actualizado[2],
+            'rol': usuario_actualizado[3],
+            'puntos': usuario_actualizado[4] or 0
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error en actualizar_usuario_admin: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# 7.4 DELETE - Eliminar un usuario (solo admin)
+@app.route('/api/admin/usuarios/<int:usuario_id>', methods=['DELETE'])
+@jwt_required()
+def eliminar_usuario_admin(usuario_id):
+    try:
+        admin_id = int(get_jwt_identity())
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT rol FROM usuarios WHERE id = %s", (admin_id,))
+        rol = cursor.fetchone()
+        
+        if not rol or rol[0] != 'admin':
+            conn.close()
+            return jsonify({'error': 'Acceso denegado'}), 403
+        
+        # Verificar que el usuario existe
+        cursor.execute("SELECT nombre FROM usuarios WHERE id = %s", (usuario_id,))
+        usuario = cursor.fetchone()
+        if not usuario:
+            conn.close()
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        nombre_usuario = usuario[0]
+        
+        # Eliminar registros de reciclaje primero (por FK)
+        cursor.execute("DELETE FROM registros_reciclaje WHERE id_usuario = %s", (usuario_id,))
+        cursor.execute("DELETE FROM usuarios WHERE id = %s", (usuario_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'mensaje': f'Usuario "{nombre_usuario}" eliminado exitosamente',
+            'id': usuario_id
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error en eliminar_usuario_admin: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ========== 8. ADMIN - ESTADÍSTICAS (GET) ==========
+
+@app.route('/api/admin/estadisticas', methods=['GET'])
+@jwt_required()
+def get_estadisticas_admin():
+    try:
+        usuario_id = int(get_jwt_identity())
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT rol FROM usuarios WHERE id = %s", (usuario_id,))
+        rol = cursor.fetchone()
+        
+        if not rol or rol[0] != 'admin':
+            conn.close()
+            return jsonify({'error': 'Acceso denegado'}), 403
+        
+        # Total de usuarios (no admin)
+        cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol != 'admin'")
+        total_usuarios = cursor.fetchone()[0] or 0
+        
+        # Total de clasificaciones
+        cursor.execute("SELECT COUNT(*) FROM registros_reciclaje")
+        total_clasificaciones = cursor.fetchone()[0] or 0
+        
+        # Total de puntos
+        cursor.execute("SELECT COALESCE(SUM(puntos_ganados), 0) FROM registros_reciclaje")
+        total_puntos = cursor.fetchone()[0] or 0
+        
+        # Materiales más clasificados
+        cursor.execute("""
+            SELECT 
+                COALESCE(t.nombre, 'desconocido') as nombre,
+                COUNT(r.id) as cantidad
             FROM registros_reciclaje r
-            JOIN tipos_residuo t ON r.id_tipo_residuo = t.id
+            LEFT JOIN tipos_residuo t ON r.id_tipo_residuo = t.id
             GROUP BY t.nombre
-            ORDER BY COUNT(r.id) DESC
+            ORDER BY cantidad DESC
         """)
         materiales = []
         for row in cursor.fetchall():
-            materiales.append({
-                'nombre': row[0],
-                'cantidad': row[1]
-            })
+            if row[0]:
+                materiales.append({
+                    'nombre': row[0],
+                    'cantidad': row[1] or 0
+                })
+        
+        # Usuario con más puntos
+        cursor.execute("""
+            SELECT nombre, puntaje_total 
+            FROM usuarios 
+            WHERE rol != 'admin' 
+            ORDER BY puntaje_total DESC 
+            LIMIT 1
+        """)
+        top_usuario = cursor.fetchone()
         
         conn.close()
         
@@ -535,17 +798,30 @@ def get_estadisticas_admin():
             'total_usuarios': total_usuarios,
             'total_clasificaciones': total_clasificaciones,
             'total_puntos': total_puntos,
-            'materiales': materiales
+            'materiales': materiales,
+            'top_usuario': {
+                'nombre': top_usuario[0] if top_usuario else 'Ninguno',
+                'puntos': top_usuario[1] if top_usuario else 0
+            } if top_usuario else None
         }), 200
         
     except Exception as e:
-        print(f"❌ Error en admin/estadisticas: {e}")
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Error en get_estadisticas_admin: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'total_usuarios': 0,
+            'total_clasificaciones': 0,
+            'total_puntos': 0,
+            'materiales': [],
+            'top_usuario': None
+        }), 200
+
+# ========== 9. TEST ==========
 
 @app.route('/api/test', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def test():
     if request.method == 'GET':
-        return jsonify({'mensaje': 'API funcionando correctamente'}), 200
+        return jsonify({'mensaje': 'GET - API funcionando correctamente'}), 200
     elif request.method == 'POST':
         return jsonify({'mensaje': 'POST exitoso', 'data': request.get_json()}), 201
     elif request.method == 'PUT':
@@ -555,9 +831,29 @@ def test():
 
 if __name__ == '__main__':
     print("=" * 50)
-    print("🌿 ECOCLASIFICADOR IA - API REST")
+    print("🌿 ECOCLASIFICADOR IA - API REST COMPLETA")
     print("=" * 50)
     print(f"📋 Clases: {CLASSES}")
     print(f"🚀 Servidor: http://localhost:5000")
+    print("=" * 50)
+    print("\n📌 ENDPOINTS DISPONIBLES:")
+    print("   🔐 Autenticación:")
+    print("      POST /api/login")
+    print("      POST /api/registro")
+    print("      GET  /api/me")
+    print("   📷 Clasificación:")
+    print("      POST /api/clasificar_webcam")
+    print("   📊 Datos:")
+    print("      GET  /api/historial")
+    print("      GET  /api/ranking")
+    print("      GET  /api/puntajes")
+    print("   👑 Admin:")
+    print("      GET    /api/admin/usuarios")
+    print("      POST   /api/admin/usuarios")
+    print("      PUT    /api/admin/usuarios/<id>")
+    print("      DELETE /api/admin/usuarios/<id>")
+    print("      GET    /api/admin/estadisticas")
+    print("   🧪 Test:")
+    print("      GET/POST/PUT/DELETE /api/test")
     print("=" * 50)
     app.run(debug=True, host='0.0.0.0', port=5000)

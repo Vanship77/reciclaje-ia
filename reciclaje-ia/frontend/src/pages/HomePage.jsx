@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaRecycle, FaCamera, FaChartBar, FaTrophy, FaUsers, FaLeaf, FaRobot, FaMicrochip, FaMapMarkerAlt, FaClock, FaPhone, FaStar } from 'react-icons/fa';
+import { FaRecycle, FaCamera, FaChartBar, FaTrophy, FaUsers, FaLeaf, FaRobot, FaMicrochip, FaMapMarkerAlt, FaClock, FaPhone, FaStar, FaInfoCircle, FaCheckCircle } from 'react-icons/fa';
 
 const HomePage = () => {
   const { user } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [testimonialIndex, setTestimonialIndex] = useState(0);
+  const [fotoIndex, setFotoIndex] = useState(0);
 
   const slides = [
     {
@@ -40,6 +41,40 @@ const HomePage = () => {
     { name: 'Javier R.', text: '"El sistema de ranking me motiva a reciclar más cada día. ¡6 clases de reciclaje!"', rating: 5 }
   ];
 
+  // ===== FOTOS PARA EL CARRUSEL (6 imágenes de reciclaje) =====
+  const fotos = [
+    {
+      url: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=800&q=80',
+      title: 'Reciclaje de Plástico',
+      desc: 'Clasificando botellas de plástico para su reciclaje'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1528323273322-d81458248d40?w=800&q=80',
+      title: 'Reciclaje de Vidrio',
+      desc: 'Separando vidrio por colores para un mejor reciclaje'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80',
+      title: 'Reciclaje Electrónico',
+      desc: 'Desechando electrónicos de forma responsable'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
+      title: 'Bosques y Naturaleza',
+      desc: 'Cuidando nuestros bosques y el medio ambiente'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1528740561666-dc2479dc08ab?w=800&q=80',
+      title: 'Reciclaje de Papel',
+      desc: 'Dando nueva vida al papel y cartón'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=800&q=80',
+      title: 'Comunidad Reciclando',
+      desc: 'Unidos por un planeta más limpio y sostenible'
+    }
+  ];
+
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
@@ -54,9 +89,16 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, [testimonials.length]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFotoIndex((prev) => (prev + 1) % fotos.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [fotos.length]);
+
   return (
     <div className="space-y-12">
-      {/* Hero Section */}
+      {/* ===== HERO SECTION (SIN BOTONES) ===== */}
       <section className="text-center py-12 animate-fadeInUp">
         <div className="flex justify-center mb-6">
           <FaRecycle className="text-7xl text-green-500 animate-pulse-slow" />
@@ -68,25 +110,105 @@ const HomePage = () => {
           Clasificación inteligente de residuos con Inteligencia Artificial.
           Detecta, clasifica y gana puntos mientras salvas el planeta.
         </p>
-        <div className="flex flex-wrap justify-center gap-4 mt-8">
-          {!user ? (
-            <>
-              <Link to="/login" className="px-8 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition-colors">
-                <FaCamera className="inline mr-2" /> Iniciar sesión
-              </Link>
-              <Link to="/registro" className="px-8 py-3 bg-white/20 hover:bg-white/30 text-white rounded-lg font-semibold backdrop-blur-sm transition-colors border border-white/20">
-                <FaUsers className="inline mr-2" /> Registrarse
-              </Link>
-            </>
-          ) : (
+        {user && (
+          <div className="flex flex-wrap justify-center gap-4 mt-8">
             <Link to="/dashboard" className="px-8 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition-colors">
               <FaChartBar className="inline mr-2" /> Ir al Dashboard
             </Link>
-          )}
+          </div>
+        )}
+      </section>
+
+      {/* ===== QUIÉNES SOMOS (NUEVO) ===== */}
+      <section className="glass-card rounded-2xl p-8">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-3xl font-bold text-white text-center mb-6">
+            <FaInfoCircle className="inline text-green-400 mr-3" />
+            ¿Quiénes Somos?
+          </h2>
+          <p className="text-lg text-gray-200 text-center leading-relaxed">
+            <span className="text-green-400 font-semibold">EcoRecicla</span> nació con la misión de hacer que el reciclaje sea 
+            <span className="text-white font-semibold"> fácil, divertido y accesible</span> para todos. 
+            Somos un equipo apasionado por la tecnología y el medio ambiente, convencidos de que 
+            <span className="text-green-300"> pequeñas acciones pueden generar grandes cambios</span>.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div className="bg-white/5 rounded-xl p-4 text-center text-white">
+              <FaRecycle className="text-4xl text-green-400 mx-auto mb-2" />
+              <h4 className="font-bold">♻️ Sostenibilidad</h4>
+              <p className="text-sm text-gray-300">Comprometidos con el medio ambiente</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4 text-center text-white">
+              <FaRobot className="text-4xl text-blue-400 mx-auto mb-2" />
+              <h4 className="font-bold">🤖 Innovación</h4>
+              <p className="text-sm text-gray-300">Tecnología IA de vanguardia</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4 text-center text-white">
+              <FaUsers className="text-4xl text-yellow-400 mx-auto mb-2" />
+              <h4 className="font-bold">👥 Comunidad</h4>
+              <p className="text-sm text-gray-300">Recicladores unidos por el planeta</p>
+            </div>
+          </div>
+          <div className="mt-6 text-center">
+            <p className="text-gray-300">
+              Nuestra plataforma utiliza <span className="text-green-400 font-semibold">Inteligencia Artificial</span> para clasificar 
+              <span className="text-white font-semibold"> 6 tipos de residuos</span> (plástico, vidrio, lata, papel, cartón y basura) 
+              en tiempo real, incentivando a las personas a reciclar mediante un sistema de puntos y ranking.
+            </p>
+          </div>
         </div>
       </section>
 
-      {/* Stats Mini */}
+      {/* ===== CARRUSEL DE FOTOS (6 IMÁGENES) ===== */}
+      <section className="glass-card rounded-2xl overflow-hidden">
+        <h3 className="text-xl font-bold text-white text-center pt-6 pb-2">
+          <FaCamera className="inline text-green-400 mr-2" />
+          Galería de Reciclaje
+        </h3>
+        <div className="relative h-96 overflow-hidden">
+          <div
+            className="flex transition-transform duration-700 ease-in-out h-full"
+            style={{ transform: `translateX(-${fotoIndex * 100}%)` }}
+          >
+            {fotos.map((foto, index) => (
+              <div key={index} className="min-w-full h-full relative">
+                <img
+                  src={foto.url}
+                  alt={foto.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+                  <h4 className="text-2xl font-bold text-white">{foto.title}</h4>
+                  <p className="text-gray-200">{foto.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setFotoIndex((prev) => (prev - 1 + fotos.length) % fotos.length)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full transition-colors"
+          >
+            ◀
+          </button>
+          <button
+            onClick={() => setFotoIndex((prev) => (prev + 1) % fotos.length)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full transition-colors"
+          >
+            ▶
+          </button>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+            {fotos.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setFotoIndex(i)}
+                className={`w-2 h-2 rounded-full transition-all ${i === fotoIndex ? 'bg-green-500 w-6' : 'bg-white/50'}`}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== STATS MINI ===== */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { icon: '♻️', label: 'Residuos reciclados', tooltip: 'Cada residuo reciclado evita contaminación' },
@@ -104,7 +226,7 @@ const HomePage = () => {
         ))}
       </section>
 
-      {/* Carrusel */}
+      {/* ===== CARRUSEL PRINCIPAL ===== */}
       <section className="glass-card rounded-2xl overflow-hidden">
         <div className="relative h-80 overflow-hidden">
           <div
@@ -143,7 +265,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Puntajes por material */}
+      {/* ===== PUNTAJES POR MATERIAL ===== */}
       <section className="glass-card rounded-2xl p-6">
         <h3 className="text-xl font-bold text-white mb-4 text-center">
           <FaStar className="inline text-yellow-400 mr-2" />
@@ -167,7 +289,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Testimonios */}
+      {/* ===== TESTIMONIOS ===== */}
       <section className="glass-card rounded-2xl p-6">
         <h3 className="text-xl font-bold text-white mb-6 text-center">
           <FaUsers className="inline text-green-400 mr-2" />
@@ -200,7 +322,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Ubicación */}
+      {/* ===== UBICACIÓN ===== */}
       <section className="glass-card rounded-2xl p-6">
         <h3 className="text-xl font-bold text-white mb-4 text-center">
           <FaMapMarkerAlt className="inline text-green-400 mr-2" />
@@ -233,7 +355,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* CTA Final */}
+      {/* ===== CTA FINAL ===== */}
       <section className="glass-card rounded-2xl p-8 text-center text-white">
         <h2 className="text-2xl font-bold mb-4">¿Listo para empezar a reciclar?</h2>
         <p className="text-lg opacity-90 max-w-2xl mx-auto mb-6">
