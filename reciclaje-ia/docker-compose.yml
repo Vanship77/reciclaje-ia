@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: reciclaje_db
+    environment:
+      POSTGRES_USER: reciclaje_user
+      POSTGRES_PASSWORD: reciclaje_password
+      POSTGRES_DB: reciclaje_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - reciclaje_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reciclaje_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: reciclaje_backend
+    environment:
+      DATABASE_URL: postgresql://reciclaje_user:reciclaje_password@db:5432/reciclaje_db
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-mi_clave_secreta_super_segura_de_mas_de_32_caracteres_1234567890}
+      SECRET_KEY: ${SECRET_KEY:-otra_clave_secreta_muy_segura}
+      FLASK_ENV: production
+      MODELO_PATH: modelo/clasificador_efficientnet.keras
+      CLASES_PATH: modelo/config_efficientnet.json
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - reciclaje_network
+    volumes:
+      - ./backend/modelo:/app/modelo
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: reciclaje_frontend
+    environment:
+      VITE_API_URL: http://backend:5000
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - reciclaje_network
+    restart: unless-stopped
+
+networks:
+  reciclaje_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

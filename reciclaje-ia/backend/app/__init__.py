@@ -32,10 +32,11 @@ def create_app():
     from app.routes.clasificacion import clasificacion_bp
     from app.routes.ranking import ranking_bp
     
-    app.register_blueprint(auth_bp, url_prefix='/api')
-    app.register_blueprint(admin_bp, url_prefix='/api')
-    app.register_blueprint(clasificacion_bp, url_prefix='/api')
-    app.register_blueprint(ranking_bp, url_prefix='/api')
+    # 🔥 CAMBIO: Ya no duplicamos url_prefix (está en el blueprint)
+    app.register_blueprint(auth_bp)      # auth_bp ya tiene url_prefix='/api'
+    app.register_blueprint(admin_bp)     # admin_bp ya tiene url_prefix='/api'
+    app.register_blueprint(clasificacion_bp)  # clasificacion_bp ya tiene url_prefix='/api'
+    app.register_blueprint(ranking_bp)   # ranking_bp ya tiene url_prefix='/api'
     
     # Ruta de test
     @app.route('/api/test', methods=['GET', 'POST', 'PUT', 'DELETE'])
@@ -49,6 +50,18 @@ def create_app():
             return jsonify({'mensaje': 'PUT exitoso', 'data': request.get_json()}), 200
         elif request.method == 'DELETE':
             return jsonify({'mensaje': 'DELETE exitoso'}), 200
+    
+    # ============================================================
+    # 🔥 RUTA /health - VERIFICAR ESTADO DEL BACKEND
+    # ============================================================
+    @app.route('/health')
+    def health():
+        from flask import jsonify
+        return jsonify({
+            'estado': 'OK',
+            'modelo': 'EfficientNetB0',
+            'version': '1.0'
+        }), 200
     
     # Crear tablas y usuarios por defecto
     with app.app_context():

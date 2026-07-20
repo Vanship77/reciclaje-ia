@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from app.models.user import db, Usuario
 
-auth_bp = Blueprint('auth', __name__)
+auth_bp = Blueprint('auth', __name__, url_prefix='/api')
 
 @auth_bp.route('/registro', methods=['POST'])
 def registro():
@@ -43,7 +43,7 @@ def login():
     usuario = Usuario.query.filter_by(email=data.get('email')).first()
     
     if usuario and usuario.check_password(data.get('password')):
-        token = create_access_token(identity=usuario.id)
+        token = create_access_token(identity=str(usuario.id))
         return jsonify({
             'token': token,
             'usuario': usuario.to_dict()

@@ -3,7 +3,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models.user import db, Usuario, Historial, Puntaje
 from sqlalchemy import func
 
-admin_bp = Blueprint('admin', __name__)
+# 🔥 AÑADIR url_prefix='/api' AQUÍ
+admin_bp = Blueprint('admin', __name__, url_prefix='/api')
 
 @admin_bp.route('/admin/usuarios', methods=['GET'])
 @jwt_required()

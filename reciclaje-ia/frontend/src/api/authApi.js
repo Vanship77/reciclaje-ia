@@ -246,7 +246,7 @@ export const createScore = crearPuntaje; // Alias
 
 export const getUsuarios = async () => {
   try {
-    const response = await api.get('/admin/usuarios');
+    const response = await api.get('/api/admin/usuarios');
     return response;
   } catch (error) {
     console.error('Error obteniendo usuarios:', error);
